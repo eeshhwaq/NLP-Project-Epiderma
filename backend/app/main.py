@@ -9,7 +9,7 @@ import io
 import numpy as np
 import joblib
 from ultralytics import YOLO
-from test import predict_rf
+from helper import predict_rf
 import os
 import uuid
 app = FastAPI()
