@@ -6,7 +6,8 @@ import { Logo } from './components/Logo';
 import { ChatMessage } from './components/ChatMessage';
 import { BoundingBoxOverlay } from './components/BoundingBoxOverlay';
 import { Message, Sender, AcneSeverity, AnalysisResult } from './types';
-import { analyzeSkinImage, chatWithRAG } from './services/geminiService';
+// import { analyzeSkinImage, chatWithRAG } from './services/geminiService';
+import { analyzeImage, sendChat } from './services/apiService';
 
 const INITIAL_MESSAGE: Message = {
   id: 'init-1',
@@ -14,6 +15,18 @@ const INITIAL_MESSAGE: Message = {
   text: "Welcome to Epiderma! 🌿\n\nI'm your AI dermatological assistant. Upload a selfie to get an instant acne analysis and treatment suggestions.",
   timestamp: Date.now()
 };
+
+function base64ToFile(base64: string, filename: string) {
+  const arr = base64.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
@@ -25,6 +38,7 @@ function App() {
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [activeAnalysis, setActiveAnalysis] = useState<AnalysisResult | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activeFile, setActiveFile] = useState<File | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,17 +92,22 @@ function App() {
   }, []);
 
   const processFile = (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image size too large. Please use an image under 5MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      handleNewImageUpload(base64);
-    };
-    reader.readAsDataURL(file);
+  if (file.size > 5 * 1024 * 1024) {
+    alert("Image size too large. Please use an image under 5MB.");
+    return;
+  }
+
+  setActiveFile(file); // store the file
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    const base64 = reader.result as string;
+    setActiveImage(base64); // still use base64 for preview
+    setActiveAnalysis(null); // Reset analysis while loading
+    triggerAnalysis(file); // send the File object instead
   };
+  reader.readAsDataURL(file);
+};
+
 
   const handleNewImageUpload = (base64Image: string) => {
     setActiveImage(base64Image);
@@ -103,63 +122,74 @@ function App() {
         processFile(e.dataTransfer.files[0]);
     }
   };
+const triggerAnalysis = async (file: File) => {
+  if (isLoading) return;
 
-  const triggerAnalysis = async (image: string) => {
-    if (isLoading) return;
-    
-    const userMsgId = uuidv4();
-    const userMsg: Message = {
-        id: userMsgId,
-        sender: Sender.User,
-        text: "Analyze this image.",
-        image: image,
-        timestamp: Date.now()
-    };
-
-    setMessages(prev => [...prev, userMsg]);
-    setIsLoading(true);
-
-    // Add temporary bot thinking message
-    const loadingMsgId = uuidv4();
-    setMessages(prev => [...prev, {
-      id: loadingMsgId,
-      sender: Sender.Bot,
-      isThinking: true,
+  const userMsgId = uuidv4();
+  const userMsg: Message = {
+      id: userMsgId,
+      sender: Sender.User,
+      text: "Analyze this image.",
+      image: URL.createObjectURL(file), // for preview only
       timestamp: Date.now()
-    }]);
-
-    try {
-        const base64Data = image.split(',')[1];
-        const analysis = await analyzeSkinImage(base64Data);
-        const responseText = `Analysis Complete.\n**Severity:** ${analysis.severity}\n**Detected:** ${analysis.detections.length} lesions.\n\n${analysis.treatment_suggestions.substring(0, 150)}...`;
-        
-        setMessages(prev => prev.map(msg => {
-            if (msg.id === loadingMsgId) {
-                return {
-                    ...msg,
-                    isThinking: false,
-                    text: responseText,
-                    image: image,
-                    analysis: analysis
-                };
-            }
-            return msg;
-        }));
-        // Explicitly set active state immediately for responsiveness
-        setActiveAnalysis(analysis);
-
-    } catch (error) {
-        console.error(error);
-        setMessages(prev => prev.map(msg => {
-            if (msg.id === loadingMsgId) {
-                return { ...msg, isThinking: false, text: "I couldn't process that image. Please try a clearer photo." };
-            }
-            return msg;
-        }));
-    } finally {
-        setIsLoading(false);
-    }
   };
+
+  setMessages(prev => [...prev, userMsg]);
+  setIsLoading(true);
+
+  // Add temporary bot thinking message
+  const loadingMsgId = uuidv4();
+  setMessages(prev => [...prev, {
+    id: loadingMsgId,
+    sender: Sender.Bot,
+    isThinking: true,
+    timestamp: Date.now()
+  }]);
+
+  try {
+      // Send the file directly
+      const analysis = await analyzeImage(file); // send file instead of base64
+
+      const a=1;
+      const b=3;
+      const c = `Based on the analysis of your skin condition, here are some treatment suggestions to help manage and improve your acne:
+
+      1. **Cleansing Routine:** Use a gentle, non-comedogenic cleanser twice daily.
+      2. **Topical Treatments:** Benzoyl peroxide or salicylic acid.
+      3. **Moisturizing:** Use a lightweight, oil-free moisturizer.
+      4. **Sun Protection:** SPF 30 daily.
+      5. **Avoid Picking:** Refrain from picking or squeezing pimples.`;
+
+      const responseText = `Analysis Complete.\n**Severity:** ${a}\n**Detected:** ${b} lesions.\n\n${c.substring(0, 150)}...`;
+
+      setMessages(prev => prev.map(msg => {
+          if (msg.id === loadingMsgId) {
+              return {
+                  ...msg,
+                  isThinking: false,
+                  text: responseText,
+                  image: URL.createObjectURL(file),
+                  analysis: analysis
+              };
+          }
+          return msg;
+      }));
+
+      setActiveAnalysis(analysis);
+
+  } catch (error) {
+      console.error(error);
+      setMessages(prev => prev.map(msg => {
+          if (msg.id === loadingMsgId) {
+              return { ...msg, isThinking: false, text: "I couldn't process that image. Please try a clearer photo." };
+          }
+          return msg;
+      }));
+  } finally {
+      setIsLoading(false);
+  }
+};
+
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -192,11 +222,12 @@ function App() {
             contextPrompt += `\n[Context: The user is asking about an image with ${activeAnalysis.severity} acne, containing ${activeAnalysis.detections.map(d => d.label).join(', ')}.]`;
         }
 
-        const text = await chatWithRAG(historyForApi, contextPrompt);
+        const { reply } = await sendChat(contextPrompt);
+        console.log(reply);
         
         setMessages(prev => prev.map(msg => {
             if (msg.id === loadingMsgId) {
-                return { ...msg, isThinking: false, text: text };
+                return { ...msg, isThinking: false, text: reply };
             }
             return msg;
         }));
@@ -269,7 +300,7 @@ function App() {
                     <div className="relative flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex items-center justify-center group">
                          {activeAnalysis ? (
                             <div className="relative w-full h-full bg-black/5 dark:bg-black/50 flex items-center justify-center p-4">
-                                <BoundingBoxOverlay imageSrc={activeImage} detections={activeAnalysis.detections} />
+                                {/* <BoundingBoxOverlay imageSrc={activeImage} detections={activeAnalysis.detections} /> */}
                             </div>
                          ) : (
                              <div className="relative w-full h-full p-4 flex items-center justify-center">
