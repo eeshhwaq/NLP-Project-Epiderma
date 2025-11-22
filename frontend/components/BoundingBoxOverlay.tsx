@@ -31,7 +31,7 @@ export const BoundingBoxOverlay: React.FC<Props> = ({ imageSrc, detections }) =>
       {imageLoaded && detections.map((det, idx) => {
         // Gemini 2.5 Flash typically returns 0-1000 normalized coordinates
         // [ymin, xmin, ymax, xmax]
-        const [ymin, xmin, ymax, xmax] = det.box_2d;
+        const [ymin, xmin, ymax, xmax] = det.bbox;
         
         const top = ymin / 10;
         const left = xmin / 10;

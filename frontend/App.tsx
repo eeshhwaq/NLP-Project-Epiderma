@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Trash2, Moon, Sun, Image as ImageIcon, X, Upload, Scan, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Logo } from './frontend/components/Logo';
-import { ChatMessage } from './frontend/components/ChatMessage';
-import { BoundingBoxOverlay } from './frontend/components/BoundingBoxOverlay';
+import { Logo } from './components/Logo';
+import { ChatMessage } from './components/ChatMessage';
+import { BoundingBoxOverlay } from './components/BoundingBoxOverlay';
 import { Message, Sender, AcneSeverity, AnalysisResult } from './types';
 // import { analyzeSkinImage, chatWithRAG } from './services/geminiService';
 import { analyzeImage, sendChat } from './services/apiService';
@@ -16,17 +16,6 @@ const INITIAL_MESSAGE: Message = {
   timestamp: Date.now()
 };
 
-function base64ToFile(base64: string, filename: string) {
-  const arr = base64.split(',');
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new File([u8arr], filename, { type: mime });
-}
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
@@ -149,6 +138,7 @@ const triggerAnalysis = async (file: File) => {
   try {
       // Send the file directly
       const analysis = await analyzeImage(file); // send file instead of base64
+      console.log("Analysis result:", analysis);
 
       const a=1;
       const b=3;
@@ -160,7 +150,7 @@ const triggerAnalysis = async (file: File) => {
       4. **Sun Protection:** SPF 30 daily.
       5. **Avoid Picking:** Refrain from picking or squeezing pimples.`;
 
-      const responseText = `Analysis Complete.\n**Severity:** ${a}\n**Detected:** ${b} lesions.\n\n${c.substring(0, 150)}...`;
+      const responseText = `Analysis Complete.\n**Severity:** ${analysis.severity}\n**Detected:** ${analysis.detections.length} lesions.\n\n${c.substring(0, 150)}...`;
 
       setMessages(prev => prev.map(msg => {
           if (msg.id === loadingMsgId) {
@@ -300,7 +290,7 @@ const triggerAnalysis = async (file: File) => {
                     <div className="relative flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex items-center justify-center group">
                          {activeAnalysis ? (
                             <div className="relative w-full h-full bg-black/5 dark:bg-black/50 flex items-center justify-center p-4">
-                                {/* <BoundingBoxOverlay imageSrc={activeImage} detections={activeAnalysis.detections} /> */}
+                                <BoundingBoxOverlay imageSrc={activeImage} detections={activeAnalysis.detections} />
                             </div>
                          ) : (
                              <div className="relative w-full h-full p-4 flex items-center justify-center">
