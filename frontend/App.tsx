@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Trash2, Moon, Sun, Image as ImageIcon, X, Upload, Scan, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Logo } from './components/Logo';
-import { ChatMessage } from './components/ChatMessage';
-import { BoundingBoxOverlay } from './components/BoundingBoxOverlay';
+import { Logo } from './frontend/components/Logo';
+import { ChatMessage } from './frontend/components/ChatMessage';
+import { BoundingBoxOverlay } from './frontend/components/BoundingBoxOverlay';
 import { Message, Sender, AcneSeverity, AnalysisResult } from './types';
 // import { analyzeSkinImage, chatWithRAG } from './services/geminiService';
 import { analyzeImage, sendChat } from './services/apiService';
@@ -12,7 +12,7 @@ import { analyzeImage, sendChat } from './services/apiService';
 const INITIAL_MESSAGE: Message = {
   id: 'init-1',
   sender: Sender.Bot,
-  text: "Welcome to Epiderma! 🌿\n\nI'm your AI dermatological assistant. Upload a selfie to get an instant acne analysis and treatment suggestions.",
+  text: "Welcome to Epiderma!\n\nI'm your AI dermatological assistant. Upload a picture to get an instant acne analysis and treatment suggestions.",
   timestamp: Date.now()
 };
 
